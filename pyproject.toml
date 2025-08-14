@@ -1,0 +1,17 @@
+[project]
+name = "eagle-router"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "dotenv>=0.9.9",
+    "fastparquet>=2024.11.0",
+    "huggingface-hub>=0.34.4",
+    "openai>=1.99.9",
+    "pandas>=2.3.1",
+    "pyarrow>=21.0.0",
+    "faiss-cpu>=1.7.4,<2.0.0",
+    "matplotlib>=3.10.5",
+    "seaborn>=0.13.2",
+]
