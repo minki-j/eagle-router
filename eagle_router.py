@@ -41,13 +41,16 @@ class EagleRouter:
         self.P = P
         self.N = N
         self.K = K
-
         # Initialize MongoDB client
         self.db = MongoDBClient(mongodb_uri, database_name)
 
         # Cache for current ELO scores and models
         self.elo_scores = None
         self.models = None
+        self.model_cost_map = {
+            "gpt-4o-mini-2024-07-18": 0.75,
+            "gpt-4o-2024-08-06": 12.5,
+        }
 
         # Load existing matrices if available
         self._load_matrices()
@@ -57,6 +60,7 @@ class EagleRouter:
         models = self.db.get_all_models()
         if models:
             self.models = models
+
             self.elo_scores = self.db.get_elo_scores(
                 models, p=self.P, n=self.N, k=self.K
             )
@@ -122,6 +126,34 @@ class EagleRouter:
 
         logger.info(f"Added training sample: {model_a} vs {model_b}, score={score}")
 
+    def _calculate_s_value_for_tied_match(self, model_a: str, model_b: str) -> float:
+        """
+        Calculate the S value (expected score) for a tied match between two models,
+        taking into account their relative costs.
+
+        The S value is used to adjust ELO updates for draws, rewarding the less expensive model:
+            - If both models have the same cost, returns 0.5 (true tie).
+            - If model_a is more expensive than model_b, returns a value < 0.5,
+              penalizing model_a for higher cost.
+            - If model_b is more expensive than model_a, returns a value > 0.5,
+              rewarding model_a for being less expensive.
+        The adjustment is proportional to the cost difference, normalized by the maximum
+        cost difference among all models.
+
+        Args:
+            model_a: Name of the first model.
+            model_b: Name of the second model.
+
+        Returns:
+            A float representing the adjusted S value for a tied match, in the range [0, 0.7].
+        """
+        global_max_cost = max(self.model_cost_map.values())
+        golbal_min_cost = min(self.model_cost_map.values())
+        max_cost_diff = abs(global_max_cost - golbal_min_cost)
+
+        cost_diff = self.model_cost_map[model_a] - self.model_cost_map[model_b]
+        return 0.5 - 0.2 * (cost_diff / max_cost_diff)
+
     def _update_elo_scores(self, model_a: str, model_b: str, score: int):
         """
         Update ELO scores based on a match result.
@@ -140,7 +172,7 @@ class EagleRouter:
         elif score == 1:  # model_b wins
             S = 0.0
         else:  # draw
-            S = 0.5
+            S = self._calculate_s_value_for_tied_match(model_a, model_b)
 
         # Get current ELO scores
         elo_a = self.elo_scores.get(model_a)
@@ -338,7 +370,7 @@ class EagleRouter:
                     elif match_result == 1:  # model_b wins
                         S = 0.0
                     else:  # draw
-                        S = 0.5
+                        S = self._calculate_s_value_for_tied_match(model_a, model_b)
 
                     # Update local ELO based on this similar prompt's result
                     local_elo_a, local_elo_b = self._calculate_new_elo(
