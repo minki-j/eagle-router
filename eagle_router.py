@@ -138,21 +138,21 @@ class EagleRouter:
             - If model_b is more expensive than model_a, returns a value > 0.5,
               rewarding model_a for being less expensive.
         The adjustment is proportional to the cost difference, normalized by the maximum
-        cost difference among all models.
+        cost difference among all models. The maximum adjustment is 0.1.
 
         Args:
             model_a: Name of the first model.
             model_b: Name of the second model.
 
         Returns:
-            A float representing the adjusted S value for a tied match, in the range [0, 0.7].
+            A float representing the adjusted S value for a tied match, in the range [0, max_adjustment].
         """
         global_max_cost = max(self.model_cost_map.values())
         golbal_min_cost = min(self.model_cost_map.values())
         max_cost_diff = abs(global_max_cost - golbal_min_cost)
 
         cost_diff = self.model_cost_map[model_a] - self.model_cost_map[model_b]
-        return 0.5 - 0.2 * (cost_diff / max_cost_diff)
+        return 0.5 - 0.1 * (cost_diff / max_cost_diff)
 
     def _update_elo_scores(self, model_a: str, model_b: str, score: int):
         """
