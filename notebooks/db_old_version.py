@@ -4,18 +4,45 @@ import pandas as pd
 
 
 class DB:
-    def __init__(self, df_path="data/train_1000.parquet"):
-        self.df = pd.read_parquet(df_path)
+    def __init__(self, df_path="../data/train_1000_with_embeddings.parquet"):
+        # Validate file exists
+        from pathlib import Path
 
-        embeddings = np.vstack(self.df["prompt_embedding"].values).astype("float32")
+        if not Path(df_path).exists():
+            raise FileNotFoundError(f"Data file not found: {df_path}")
+
+        try:
+            self.df = pd.read_parquet(df_path)
+        except Exception as e:
+            raise ValueError(f"Failed to read parquet file: {e}")
+
+        # Validate required columns exist
+        if "prompt_embedding" not in self.df.columns:
+            raise ValueError("Missing required column: 'prompt_embedding'")
+
+        # Extract and validate embeddings
+        try:
+            embeddings = np.vstack(self.df["prompt_embedding"].values).astype("float32")
+        except Exception as e:
+            raise ValueError(f"Failed to process embeddings: {e}")
+
+        # Validate embedding dimensions are consistent
+        if len(embeddings.shape) != 2:
+            raise ValueError(
+                f"Invalid embedding shape: expected 2D array, got {embeddings.shape}"
+            )
 
         # Create FAISS index for L2 distance
-        self.index = faiss.IndexFlatL2(embeddings.shape[1])
+        self.embedding_dim = embeddings.shape[1]
+        self.index = faiss.IndexFlatL2(self.embedding_dim)
         self.index.add(embeddings)
 
-        # clean up memory
+        # Store the number of embeddings for validation
+        self.num_embeddings = len(embeddings)
+
+        # Clean up memory - create a copy instead of modifying in place
         del embeddings
-        self.df.drop(columns=["prompt_embedding"], inplace=True)
+        self.df = self.df.drop(columns=["prompt_embedding"])
 
     def get_total_rows(self):
         return len(self.df)
