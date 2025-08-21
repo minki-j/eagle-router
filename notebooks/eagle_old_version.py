@@ -1,4 +1,4 @@
-from db import DB
+from notebooks.db_old_version import DB
 
 
 class EagleRouter:
@@ -53,7 +53,11 @@ class EagleRouter:
             self._update_global(self.model_a, self.model_b, winner)
 
     def route(self, query_prompt_embedding):
-        local_scores = self.global_scores.copy()
+        local_scores = {
+            self.model_a: 100,
+            self.model_b: 100,
+        }
+        # local_scores = self.global_scores.copy()
 
         # Calculate local scores
         # First, get nearest neighbors from stored feedback
@@ -75,10 +79,18 @@ class EagleRouter:
             local_scores[self.model_a], local_scores[self.model_b] = R_a_new, R_b_new
 
         # Combine local and global scores
-        combined = {
+        result_dict = {
             m: self.P * self.global_scores[m] + (1 - self.P) * local_scores[m]
             for m in [self.model_a, self.model_b]
         }
+        # print(
+        #     "global: ",
+        #     self.global_scores,
+        #     "\nlocal: ",
+        #     local_scores,
+        #     f"\ncombined with {self.P}: ",
+        #     combined,
+        # )
 
         # Return the best model
-        return max(combined, key=combined.get)
+        return result_dict
